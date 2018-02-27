@@ -1,13 +1,10 @@
 #include <cox.h>
 
-// Timer timerHello;
+Timer timerHello;
 
 static void taskHello(void *) {
   Serial.println("Hello! This is Serial.");
   Serial2.println("Hello! This is Serial2.");
-  Serial.printf("Delay 5 sec...\n");
-  delay(5000);
-  postTask(taskHello, NULL);
 }
 
 static void eventSerialRx(SerialPort &p) {
@@ -28,7 +25,6 @@ void setup() {
   Serial2.onReceive(eventSerialRx);
   Serial2.listen();
 
-  // timerHello.onFired(taskHello, NULL);
-  // timerHello.startPeriodic(1000);
-  postTask(taskHello, NULL);
+  timerHello.onFired(taskHello, NULL);
+  timerHello.startPeriodicMicros(1000000);
 }
