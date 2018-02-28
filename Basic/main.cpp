@@ -3,8 +3,11 @@
 Timer timerHello;
 
 static void taskHello(void *) {
-  Serial.println("Hello! This is Serial.");
-  Serial2.println("Hello! This is Serial2.");
+  Serial.printf(
+    "Hello! This is Serial. msec:%u, usec:%u, sec:%u\n",
+    millis(), micros(), seconds()
+  );
+  Serial2.printf("Hello! This is Serial2.\n");
 }
 
 static void eventSerialRx(SerialPort &p) {
