@@ -4,13 +4,14 @@ Timer timerHello;
 Timer timerHello2;
 
 static void taskHello(void *) {
+  struct timeval t;
+  gettimeofday(&t, NULL);
+
   Serial.printf(
-    "Hello every 1sec. msec:%u, usec:%u, sec:%u,",
-    millis(), micros(), seconds()
+    "Hello every 1sec. This is Serial. gettimeofday:%u.%06u,", t.tv_sec, t.tv_usec
   );
   Serial2.printf(
-    "Hello every 1sec. This is Serial. msec:%u, usec:%u, sec:%u\n",
-    millis(), micros(), seconds()
+    "Hello every 1sec. This is Serial2. gettimeofday:%u.%06u,", t.tv_sec, t.tv_usec
   );
 
   digitalToggle(2);
@@ -18,13 +19,14 @@ static void taskHello(void *) {
 }
 
 static void taskHello2(void *) {
+  struct timeval t;
+  gettimeofday(&t, NULL);
+
   Serial.printf(
-    "Hello every 5sec. msec:%u, usec:%u, sec:%u\n",
-    millis(), micros(), seconds()
+    "Hello every 5sec. This is Serial. gettimeofday:%u.%06u\n", t.tv_sec, t.tv_usec
   );
   Serial2.printf(
-    "Hello every 5sec. msec:%u, usec:%u, sec:%u\n",
-    millis(), micros(), seconds()
+    "Hello every 5sec. This is Serial2. gettimeofday:%u.%06u\n", t.tv_sec, t.tv_usec
   );
 }
 
