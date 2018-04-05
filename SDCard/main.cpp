@@ -27,6 +27,14 @@ void setup() {
   Serial.println("File written.");
 
   // Check if destination file exists before renaming
+
+  // TODO Original example code from ESP-IDF uses stat() like below. But it's not working...:-\
+  // struct stat st;
+  // if (stat("/sdcard/foo.txt", &st) == 0) {
+  //   // Delete it if it exists
+  //   unlink("/sdcard/foo.txt");
+  // }
+
   f = fopen("/sdcard/foo.txt", "r");
   if (f) {
     fclose(f);
