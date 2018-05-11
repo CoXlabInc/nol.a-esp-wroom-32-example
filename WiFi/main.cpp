@@ -1,4 +1,39 @@
 #include <cox.h>
+#include <HTTPClient.hpp>
+
+const char *rootCA = \
+"-----BEGIN CERTIFICATE-----\n"\
+"MIIFdDCCBFygAwIBAgIQJ2buVutJ846r13Ci/ITeIjANBgkqhkiG9w0BAQwFADBv\n"\
+"MQswCQYDVQQGEwJTRTEUMBIGA1UEChMLQWRkVHJ1c3QgQUIxJjAkBgNVBAsTHUFk\n"\
+"ZFRydXN0IEV4dGVybmFsIFRUUCBOZXR3b3JrMSIwIAYDVQQDExlBZGRUcnVzdCBF\n"\
+"eHRlcm5hbCBDQSBSb290MB4XDTAwMDUzMDEwNDgzOFoXDTIwMDUzMDEwNDgzOFow\n"\
+"gYUxCzAJBgNVBAYTAkdCMRswGQYDVQQIExJHcmVhdGVyIE1hbmNoZXN0ZXIxEDAO\n"\
+"BgNVBAcTB1NhbGZvcmQxGjAYBgNVBAoTEUNPTU9ETyBDQSBMaW1pdGVkMSswKQYD\n"\
+"VQQDEyJDT01PRE8gUlNBIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MIICIjANBgkq\n"\
+"hkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAkehUktIKVrGsDSTdxc9EZ3SZKzejfSNw\n"\
+"AHG8U9/E+ioSj0t/EFa9n3Byt2F/yUsPF6c947AEYe7/EZfH9IY+Cvo+XPmT5jR6\n"\
+"2RRr55yzhaCCenavcZDX7P0N+pxs+t+wgvQUfvm+xKYvT3+Zf7X8Z0NyvQwA1onr\n"\
+"ayzT7Y+YHBSrfuXjbvzYqOSSJNpDa2K4Vf3qwbxstovzDo2a5JtsaZn4eEgwRdWt\n"\
+"4Q08RWD8MpZRJ7xnw8outmvqRsfHIKCxH2XeSAi6pE6p8oNGN4Tr6MyBSENnTnIq\n"\
+"m1y9TBsoilwie7SrmNnu4FGDwwlGTm0+mfqVF9p8M1dBPI1R7Qu2XK8sYxrfV8g/\n"\
+"vOldxJuvRZnio1oktLqpVj3Pb6r/SVi+8Kj/9Lit6Tf7urj0Czr56ENCHonYhMsT\n"\
+"8dm74YlguIwoVqwUHZwK53Hrzw7dPamWoUi9PPevtQ0iTMARgexWO/bTouJbt7IE\n"\
+"IlKVgJNp6I5MZfGRAy1wdALqi2cVKWlSArvX31BqVUa/oKMoYX9w0MOiqiwhqkfO\n"\
+"KJwGRXa/ghgntNWutMtQ5mv0TIZxMOmm3xaG4Nj/QN370EKIf6MzOi5cHkERgWPO\n"\
+"GHFrK+ymircxXDpqR+DDeVnWIBqv8mqYqnK8V0rSS527EPywTEHl7R09XiidnMy/\n"\
+"s1Hap0flhFMCAwEAAaOB9DCB8TAfBgNVHSMEGDAWgBStvZh6NLQm9/rEJlTvA73g\n"\
+"JMtUGjAdBgNVHQ4EFgQUu69+Aj36pvE8hI6t7jiY7NkyMtQwDgYDVR0PAQH/BAQD\n"\
+"AgGGMA8GA1UdEwEB/wQFMAMBAf8wEQYDVR0gBAowCDAGBgRVHSAAMEQGA1UdHwQ9\n"\
+"MDswOaA3oDWGM2h0dHA6Ly9jcmwudXNlcnRydXN0LmNvbS9BZGRUcnVzdEV4dGVy\n"\
+"bmFsQ0FSb290LmNybDA1BggrBgEFBQcBAQQpMCcwJQYIKwYBBQUHMAGGGWh0dHA6\n"\
+"Ly9vY3NwLnVzZXJ0cnVzdC5jb20wDQYJKoZIhvcNAQEMBQADggEBAGS/g/FfmoXQ\n"\
+"zbihKVcN6Fr30ek+8nYEbvFScLsePP9NDXRqzIGCJdPDoCpdTPW6i6FtxFQJdcfj\n"\
+"Jw5dhHk3QBN39bSsHNA7qxcS1u80GH4r6XnTq1dFDK8o+tDb5VCViLvfhVdpfZLY\n"\
+"Uspzgb8c8+a4bmYRBbMelC1/kZWSWfFMzqORcUx8Rww7Cxn2obFshj5cqsQugsv5\n"\
+"B5a6SE2Q8pTIqXOi6wZ7I53eovNNVZ96YUWYGGjHXkBrI/V5eu+MtWuLt29G9Hvx\n"\
+"PUsE2JOAWVrgQSQdso8VYFhH2+9uRv0V9dlfmrPb2LjkQLPNlzmuhbsdjrzch5vR\n"\
+"pu/xO28QOG8=\n"\
+"-----END CERTIFICATE-----\n";
 
 char keyBuf[256];
 
@@ -30,11 +65,14 @@ static void printMenu() {
   printf("- scan\n");
   printf("- connect {last scanned network index} {password}\n");
   printf("- disconnect\n");
+  printf("- http get test\n");
+  printf("- https get test\n");
 }
 
 static void eventKeyboard(SerialPort &) {
   unsigned i;
   char password[20];
+
   if (strcmp(keyBuf, "scan") == 0) {
     scanNetworks();
   } else if (strcmp(keyBuf, "disconnect") == 0) {
@@ -54,16 +92,40 @@ static void eventKeyboard(SerialPort &) {
     if (ssid) {
       printf("- Connect to '%s'...\n", ssid);
       WiFi.begin(ssid, password);
-      Serial.inputKeyboard(keyBuf, sizeof(keyBuf) - 1);
-      return;
+      goto success;
     } else {
       printf("- Invalid index.\n");
     }
+  } else if (memcmp(keyBuf, "http", 4) == 0) {
+    HTTPClient http;
+
+    if (strcmp(keyBuf, "http get test") == 0) {
+      http.begin("http://www.coxlab.kr/");
+    } else if (strcmp(keyBuf, "https get test") == 0) {
+      http.begin("https://town.coxlab.kr/", rootCA);
+    } else {
+      goto error;
+    }
+
+    int responseCode = http.GET();
+    if (responseCode > 0) {
+      printf("- responseCode:%d\n", responseCode);
+      if (responseCode == HTTP_CODE_OK) {
+        String payload = http.getString();
+        printf("- Payload:%s\n", payload.c_str());
+      }
+    } else {
+      printf("- GET failed (error:%s)\n", http.errorToString(responseCode).c_str());
+    }
+    http.end();
   } else {
     printf("* Unknown command\n");
   }
 
+  error:
   printMenu();
+
+  success:
   Serial.inputKeyboard(keyBuf, sizeof(keyBuf) - 1);
 }
 
@@ -81,18 +143,9 @@ static void eventWiFi(WiFiClass::event_id_t event, void *info) {
 
     case (WiFi.EVENT_STA_GOT_IP):
     printf("got IP:\n");
-    printf(
-      "- IP:%u.%u.%u.%u\n",
-      WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]
-    );
-    printf(
-      "- Gateway:%u.%u.%u.%u\n",
-      WiFi.gatewayIP()[0], WiFi.gatewayIP()[1], WiFi.gatewayIP()[2], WiFi.gatewayIP()[3]
-    );
-    printf(
-      "- Subnet Mask:%u.%u.%u.%u\n",
-      WiFi.subnetMask()[0], WiFi.subnetMask()[1], WiFi.subnetMask()[2], WiFi.subnetMask()[3]
-    );
+    printf("- IP:%s\n", WiFi.localIP().toString().c_str());
+    printf("- Gateway:%s\n", WiFi.gatewayIP().toString().c_str());
+    printf("- Subnet Mask:%s\n", WiFi.subnetMask().toString().c_str());
     break;
 
     case (WiFi.EVENT_STA_LOST_IP):
