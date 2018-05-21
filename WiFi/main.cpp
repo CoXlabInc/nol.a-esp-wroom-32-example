@@ -111,8 +111,7 @@ static void eventKeyboard(SerialPort &) {
     if (responseCode > 0) {
       printf("- responseCode:%d\n", responseCode);
       if (responseCode == HTTP_CODE_OK) {
-        String payload = http.getString();
-        printf("- Payload:%s\n", payload.c_str());
+        http.writeToStream(&Serial);
       }
     } else {
       printf("- GET failed (error:%s)\n", http.errorToString(responseCode).c_str());
