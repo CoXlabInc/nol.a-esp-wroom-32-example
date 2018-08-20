@@ -1,7 +1,9 @@
 #include <cox.h>
+#include <esp32/ESP32Serial.hpp>
 
 Timer timerHello;
 Timer timerHello2;
+ESP32Serial Serial2(ESP32Serial::PORT2, 17, 16);
 
 static void taskHello(void *) {
   struct timeval t;
@@ -37,7 +39,7 @@ static void eventKeyPressed() {
 static void eventSerialRx(SerialPort &p) {
   while (p.available() > 0) {
     char c = p.read();
-    p.write(c); //echo
+    Serial.write(c); //echo or forward
   }
 }
 
@@ -47,7 +49,7 @@ void setup() {
   Serial.onReceive(eventSerialRx);
   Serial.listen();
 
-  Serial2.begin(115200);
+  Serial2.begin(9600);
   Serial2.println("*** [ESP-WROOM-32] Basic ***");
   Serial2.onReceive(eventSerialRx);
   Serial2.listen();
