@@ -3,6 +3,7 @@
 #include <Adafruit_SSD1306.hpp>
 #include <Adafruit_GFX.hpp>
 #include <esp32/ESP32TwoWire.hpp>
+#include <esp32/ESP32Serial.hpp>
 #include <HTTPClient.hpp>
 
 const char *rootCA = \
@@ -42,6 +43,7 @@ const char *rootCA = \
 #define IOTOWN_TOKEN "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"; // replace with your token
 #define IOTOWN_NID   "WF1" // replace with your node ID
 
+ESP32Serial Serial2(ESP32Serial::PORT2, 17, 16);
 PMS3003 pms3003 = PMS3003(Serial2, 19, 18);
 ESP32TwoWire Wire(0, 27, 14, 400000);
 Adafruit_SSD1306 display(-1, Wire, 0x3C);
