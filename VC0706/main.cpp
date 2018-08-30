@@ -1,10 +1,8 @@
 #include <cox.h>
-#include <PMS3003.hpp>
-#include <Adafruit_SSD1306.hpp>
-#include <Adafruit_GFX.hpp>
-#include <esp32/ESP32TwoWire.hpp>
-#include <esp32/ESP32Serial.hpp>
+#include "VC0706.hpp"
 #include <HTTPClient.hpp>
+#include <base64.hpp>
+#include <esp32/ESP32Serial.hpp>
 
 const char *rootCA = \
 "-----BEGIN CERTIFICATE-----\n"\
@@ -40,28 +38,51 @@ const char *rootCA = \
 "pu/xO28QOG8=\n"\
 "-----END CERTIFICATE-----\n";
 
-#define IOTOWN_TOKEN "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"; // replace with your token
+#define IOTOWN_TOKEN "b9df6fd441fda4e8f76e1c446fd141ebae8672ed24aca15c4522184fb706411a"; // replace with your token
 #define IOTOWN_NID   "WF1" // replace with your node ID
 
+Timer timerTakePicture;
+Timer timerKeyInput;
+Timer temp;
+
 ESP32Serial Serial2(ESP32Serial::PORT2, 17, 16);
-PMS3003 pms3003 = PMS3003(Serial2, 19, 18);
-ESP32TwoWire Wire(0, 27, 14, 400000);
-Adafruit_SSD1306 display(-1, Wire, 0x3C);
-Timer timerReport;
+VC0706 camera(Serial2);
+
 String jsonData;
 uint16_t seq = 0;
+int i=0;
+char keyBuf[128];
 
-static void taskPeriodicReport(void *) {
+static void eventOnPictureTaken(const char *buf, uint32_t size)
+{
+  printf("ReadImage Done : %ld (BYTE)\n", camera.imageSize );
+  uint32_t index = 0;
+
+  String encoded = base64::encode((uint8_t *) buf, size);
+
+  while(encoded.indexOf('\n',index) != -1){
+    index = encoded.indexOf('\n',index);
+    encoded.remove(index,1);
+    System.feedWatchdog();
+  }
+
+  jsonData = "{\"type\":\"2\",\"token\":\"";
+  jsonData += IOTOWN_TOKEN;
+  jsonData += "\",\"nid\":\"";
+  jsonData += IOTOWN_NID;
+  jsonData += "\",\"data\":{\"cam1\":\"";
+  for(uint32_t i=0;i<encoded.length();i++){
+    System.feedWatchdog();
+    jsonData += encoded[i];
+  }
+  jsonData += "\"}}";
+
   if (jsonData.length() == 0) {
     printf("* Report data is not ready.\n");
     return;
   }
 
-  digitalWrite(2, HIGH);
-
   if (WiFi.isConnected()) {
-    printf("[#%u] POST data: %s\n", seq++, jsonData.c_str());
-
     HTTPClient http;
     http.begin("https://town.coxlab.kr/api/data", rootCA);
     http.addHeader("Content-Type", "application/json");
@@ -79,42 +100,49 @@ static void taskPeriodicReport(void *) {
     printf("* WiFi is not connected.\n");
   }
 
-  digitalWrite(2, LOW);
+  timerKeyInput.startOneShot(10000);
 }
 
-static void eventSensorMeasuredDone(
-  int32_t pm1_0_CF1,
-  int32_t pm2_5_CF1,
-  int32_t pm10_0_CF1,
-  int32_t pm1_0_Atmosphere,
-  int32_t pm2_5_Atmosphere,
-  int32_t pm10_0_Atmosphere
-) {
-  printf("* (CF=1) PM1.0:%d, PM2.5:%d, PM10:%d (unit: ug/m^3)\n", pm1_0_CF1, pm2_5_CF1, pm10_0_CF1);
-  printf("* (Atmosphere) PM1.0:%d, PM2.5:%d, PM10:%d (unit: ug/m^3)\n", pm1_0_Atmosphere, pm2_5_Atmosphere, pm10_0_Atmosphere);
-
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.print("PM1.0: "); display.println(pm1_0_Atmosphere);
-  display.print("PM2.5: "); display.println(pm2_5_Atmosphere);
-  display.print("PM10 : "); display.println(pm10_0_Atmosphere);
-  display.display();
-
-  jsonData = "{\"type\":\"2\",\"token\":\"";
-  jsonData += IOTOWN_TOKEN;
-  jsonData += "\",\"nid\":\"";
-  jsonData += IOTOWN_NID;
-  jsonData += "\",\"data\":{\"PM1_0\":";
-  jsonData += pm1_0_Atmosphere;
-  jsonData += ",\"PM2_5\":";
-  jsonData += pm2_5_Atmosphere;
-  jsonData += ",\"PM10\":";
-  jsonData += pm10_0_Atmosphere;
-  jsonData += "}}";
-  printf("To be POST data: %s\n", jsonData.c_str());
+void eventRatioKeyInputDone(void *)
+{
+  printf("\nTake a picture\n" );
+  Serial.stopListening();
+  camera.takePicture(eventOnPictureTaken, camera.ratio);
 }
 
-static void eventWiFi(WiFiClass::event_id_t event, void *info) {
+static void eventRatioKeyInput(SerialPort &)
+{
+  uint8_t numOctets = strlen(keyBuf);
+  numOctets /= 2;
+  char strOctet[3];
+  for (uint8_t j = 0; j < numOctets; j++) {
+    strOctet[0] = keyBuf[2 * j];
+    strOctet[1] = keyBuf[2 * j + 1];
+    strOctet[2] = '\0';
+
+    camera.ratio = strtoul(strOctet, NULL, 16);
+  }
+  timerKeyInput.startOneShot(5000);
+}
+
+static void eventKeyInput(SerialPort &)
+{
+  timerKeyInput.stop();
+
+  while (Serial.available() > 0) {
+    Serial.read();
+  }
+
+  Serial.onReceive(eventRatioKeyInput);
+  Serial.inputKeyboard(keyBuf, sizeof(keyBuf) - 1);
+  Serial.println(
+    "* Enter a new compression ratio as a hexadecimal string "
+    "[00~FF]"
+  );
+}
+
+static void eventWiFi(WiFiClass::event_id_t event, void *info)
+{
   printf("* WiFi event(%d): ", event);
 
   switch (event) {
@@ -124,7 +152,7 @@ static void eventWiFi(WiFiClass::event_id_t event, void *info) {
 
     case (WiFi.EVENT_STA_DISCONNECTED):
     printf("disconnected.\n");
-    timerReport.stop();
+    timerTakePicture.stop();
     WiFi.reconnect();
     break;
 
@@ -133,7 +161,12 @@ static void eventWiFi(WiFiClass::event_id_t event, void *info) {
     printf("- IP:%s\n", WiFi.localIP().toString().c_str());
     printf("- Gateway:%s\n", WiFi.gatewayIP().toString().c_str());
     printf("- Subnet Mask:%s\n", WiFi.subnetMask().toString().c_str());
-    timerReport.startPeriodic(10000);
+
+    Serial.println("* Press ansy key to enter a compression ratio in 5 seconds..." );
+    Serial.onReceive(eventKeyInput);
+    timerKeyInput.onFired(eventRatioKeyInputDone,NULL);
+    timerKeyInput.startOneShot(5000);
+    Serial.listen();
     break;
 
     case (WiFi.EVENT_STA_LOST_IP):
@@ -146,30 +179,17 @@ static void eventWiFi(WiFiClass::event_id_t event, void *info) {
   }
 }
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
-  printf("\n*** [ESP-WROOM-32] PMS3003 Particle sensor test ***\n");
-
-  pinMode(2, OUTPUT);
-  digitalWrite(2, HIGH);
-
-  pms3003.begin();
-  pms3003.onReadDone(eventSensorMeasuredDone);
+  camera.begin();
+  Serial.println("\n\t***** VC0706 camera test *****" );
 
   WiFi.mode(WiFi.MODE_STA);
   WiFi.disconnect();
-
-  display.begin(SSD1306_SWITCHCAPVCC);
-  display.setTextColor(WHITE);
-  display.setTextSize(2);
-  display.clearDisplay();
-  display.print("* PMS3003 *");
-  display.display();
 
   delay(100);
 
   WiFi.onEvent(eventWiFi);
   WiFi.begin("coxlab2", "johnsnow");
-
-  timerReport.onFired(taskPeriodicReport, NULL);
 }
