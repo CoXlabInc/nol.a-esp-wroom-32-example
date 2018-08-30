@@ -32,8 +32,13 @@ static void taskHello2(void *) {
   );
 }
 
-static void eventKeyPressed() {
-  Serial.printf("* Key connected to GPIO0 is pressed!\n");
+static void eventKeyPressed(GPIOInterruptInfo_t &info) {
+  struct timeval now;
+  gettimeofday(&now, NULL);
+  Serial.printf(
+    "* Key connected to GPIO(%d) is pressed! (interrupt:%u.%06u, now:%u.%06u)\n",
+    info.pin, info.tEnteredISR.tv_sec, info.tEnteredISR.tv_usec, now.tv_sec, now.tv_usec
+  );
 }
 
 static void eventSerialRx(SerialPort &p) {
@@ -64,5 +69,5 @@ void setup() {
   digitalWrite(2, HIGH);
 
   pinMode(0, INPUT);
-  attachInterrupt(0, eventKeyPressed, FALLING);
+  attachInterrupt(0, eventKeyPressed, NULL, FALLING);
 }
