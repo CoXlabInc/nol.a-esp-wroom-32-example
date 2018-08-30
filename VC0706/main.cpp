@@ -42,7 +42,7 @@ const char *rootCA = \
 #define IOTOWN_NID   "WF1" // replace with your node ID
 
 Timer timerTakePicture;
-Timer timerKeyInput;
+Timer timerCamera;
 Timer temp;
 
 ESP32Serial Serial2(ESP32Serial::PORT2, 17, 16);
@@ -53,9 +53,11 @@ uint16_t seq = 0;
 int i=0;
 char keyBuf[128];
 
-static void eventOnPictureTaken(const char *buf, uint32_t size)
-{
-  printf("ReadImage Done : %ld (BYTE)\n", camera.imageSize );
+static void eventOnPictureTaken(const char *buf, uint32_t size) {
+  struct timeval now;
+  gettimeofday(&now, NULL);
+
+  printf("[%ld.%06ld] ReadImage Done : %u (BYTE)\n", now.tv_sec, now.tv_usec, camera.imageSize);
   uint32_t index = 0;
 
   String encoded = base64::encode((uint8_t *) buf, size);
@@ -63,19 +65,15 @@ static void eventOnPictureTaken(const char *buf, uint32_t size)
   while(encoded.indexOf('\n',index) != -1){
     index = encoded.indexOf('\n',index);
     encoded.remove(index,1);
-    System.feedWatchdog();
   }
 
   jsonData = "{\"type\":\"2\",\"token\":\"";
   jsonData += IOTOWN_TOKEN;
   jsonData += "\",\"nid\":\"";
   jsonData += IOTOWN_NID;
-  jsonData += "\",\"data\":{\"cam1\":\"";
-  for(uint32_t i=0;i<encoded.length();i++){
-    System.feedWatchdog();
-    jsonData += encoded[i];
-  }
-  jsonData += "\"}}";
+  jsonData += "\",\"data\":{\"cam1\":{\"type\":\"image/jpeg\",\"raw\":\"";
+  jsonData += encoded;
+  jsonData += "\"}}}";
 
   if (jsonData.length() == 0) {
     printf("* Report data is not ready.\n");
@@ -88,30 +86,36 @@ static void eventOnPictureTaken(const char *buf, uint32_t size)
     http.addHeader("Content-Type", "application/json");
     int responseCode = http.POST(jsonData);
 
+    gettimeofday(&now, NULL);
+
     if (responseCode == HTTP_CODE_OK) {
+      printf("[%ld.%06ld] POST success: ", now.tv_sec, now.tv_usec);
       http.writeToStream(&Serial);
       Serial.println();
-      Serial.flush();
     } else {
-      printf("- POST failed (error:%s)\n", http.errorToString(responseCode).c_str());
+      printf(
+        "[%ld.%06ld] POST failed (error:%s)\n",
+        now.tv_sec, now.tv_usec,
+        http.errorToString(responseCode).c_str()
+      );
       http.end();
     }
   } else {
     printf("* WiFi is not connected.\n");
   }
 
-  timerKeyInput.startOneShot(10000);
+  timerCamera.startOneShot(10000);
 }
 
-void eventRatioKeyInputDone(void *)
-{
-  printf("\nTake a picture\n" );
+void taskTakePicture(void *) {
+  struct timeval now;
+  gettimeofday(&now, NULL);
+  printf("\n[%ld.%06ld] Take a picture\n", now.tv_sec, now.tv_usec);
   Serial.stopListening();
   camera.takePicture(eventOnPictureTaken, camera.ratio);
 }
 
-static void eventRatioKeyInput(SerialPort &)
-{
+static void eventRatioKeyInput(SerialPort &) {
   uint8_t numOctets = strlen(keyBuf);
   numOctets /= 2;
   char strOctet[3];
@@ -122,12 +126,11 @@ static void eventRatioKeyInput(SerialPort &)
 
     camera.ratio = strtoul(strOctet, NULL, 16);
   }
-  timerKeyInput.startOneShot(5000);
+  timerCamera.startOneShot(5000);
 }
 
-static void eventKeyInput(SerialPort &)
-{
-  timerKeyInput.stop();
+static void eventKeyInput(SerialPort &) {
+  timerCamera.stop();
 
   while (Serial.available() > 0) {
     Serial.read();
@@ -136,13 +139,11 @@ static void eventKeyInput(SerialPort &)
   Serial.onReceive(eventRatioKeyInput);
   Serial.inputKeyboard(keyBuf, sizeof(keyBuf) - 1);
   Serial.println(
-    "* Enter a new compression ratio as a hexadecimal string "
-    "[00~FF]"
+    "* Enter a new compression ratio as a hexadecimal string. [00~FF]"
   );
 }
 
-static void eventWiFi(WiFiClass::event_id_t event, void *info)
-{
+static void eventWiFi(WiFiClass::event_id_t event, void *info) {
   printf("* WiFi event(%d): ", event);
 
   switch (event) {
@@ -164,8 +165,8 @@ static void eventWiFi(WiFiClass::event_id_t event, void *info)
 
     Serial.println("* Press ansy key to enter a compression ratio in 5 seconds..." );
     Serial.onReceive(eventKeyInput);
-    timerKeyInput.onFired(eventRatioKeyInputDone,NULL);
-    timerKeyInput.startOneShot(5000);
+    timerCamera.onFired(taskTakePicture, NULL);
+    timerCamera.startOneShot(5000);
     Serial.listen();
     break;
 
@@ -179,8 +180,7 @@ static void eventWiFi(WiFiClass::event_id_t event, void *info)
   }
 }
 
-void setup()
-{
+void setup() {
   Serial.begin(115200);
   camera.begin();
   Serial.println("\n\t***** VC0706 camera test *****" );
