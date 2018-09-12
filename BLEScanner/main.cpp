@@ -61,7 +61,7 @@ void setup() {
     ble->setScanWindow(10000);
 
     ble->onScanned(eventBLEAdvScanned);
-    error_t err = ble->beginScan();
+    error_t err = ble->beginScan(true);
     printf("* beginScan: %d\n", err);
   } else {
     printf("* BLE stack initializing failed\n");
