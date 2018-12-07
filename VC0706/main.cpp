@@ -53,14 +53,27 @@ uint16_t seq = 0;
 int i=0;
 char keyBuf[128];
 
-static void eventOnPictureTaken(const char *buf, uint32_t size) {
-  struct timeval now;
-  gettimeofday(&now, NULL);
+static void taskTakePicture(void *);
 
-  printf("[%ld.%06ld] ReadImage Done : %u (BYTE)\n", now.tv_sec, now.tv_usec, camera.imageSize);
+static void eventOnPictureTaken(void *, const char *buf, uint32_t size) {
+  struct timeval now;
+  gettimeofday(&now, nullptr);
+
+  printf("[%ld.%06ld] ReadImage Done : %u (BYTE)\n", now.tv_sec, now.tv_usec, size);
+  if (size == 0) {
+    printf("* 0-size image.\n");
+    postTask(taskTakePicture, nullptr);
+    return;
+  }
+
   uint32_t index = 0;
 
   String encoded = base64::encode((uint8_t *) buf, size);
+  if (encoded == "-FAIL-" || encoded.length() == 0) {
+    printf("* Base64 encoding failed\n");
+    postTask(taskTakePicture, nullptr);
+    return;
+  }
 
   while(encoded.indexOf('\n',index) != -1){
     index = encoded.indexOf('\n',index);
@@ -75,8 +88,9 @@ static void eventOnPictureTaken(const char *buf, uint32_t size) {
   jsonData += encoded;
   jsonData += "\"}}}";
 
-  if (jsonData.length() == 0) {
+  if (jsonData.length() < encoded.length()) {
     printf("* Report data is not ready.\n");
+    postTask(taskTakePicture, nullptr);
     return;
   }
 
@@ -86,7 +100,7 @@ static void eventOnPictureTaken(const char *buf, uint32_t size) {
     http.addHeader("Content-Type", "application/json");
     int responseCode = http.POST(jsonData);
 
-    gettimeofday(&now, NULL);
+    gettimeofday(&now, nullptr);
 
     if (responseCode == HTTP_CODE_OK) {
       printf("[%ld.%06ld] POST success: ", now.tv_sec, now.tv_usec);
@@ -107,12 +121,12 @@ static void eventOnPictureTaken(const char *buf, uint32_t size) {
   timerCamera.startOneShot(10000);
 }
 
-void taskTakePicture(void *) {
+static void taskTakePicture(void *) {
   struct timeval now;
-  gettimeofday(&now, NULL);
+  gettimeofday(&now, nullptr);
   printf("\n[%ld.%06ld] Take a picture\n", now.tv_sec, now.tv_usec);
   Serial.stopListening();
-  camera.takePicture(eventOnPictureTaken, camera.ratio);
+  camera.takePicture(eventOnPictureTaken, nullptr);
 }
 
 static void eventRatioKeyInput(SerialPort &) {
@@ -124,7 +138,7 @@ static void eventRatioKeyInput(SerialPort &) {
     strOctet[1] = keyBuf[2 * j + 1];
     strOctet[2] = '\0';
 
-    camera.ratio = strtoul(strOctet, NULL, 16);
+    camera.ratio = strtoul(strOctet, nullptr, 16);
   }
   timerCamera.startOneShot(5000);
 }
@@ -163,9 +177,9 @@ static void eventWiFi(WiFiClass::event_id_t event, void *info) {
     printf("- Gateway:%s\n", WiFi.gatewayIP().toString().c_str());
     printf("- Subnet Mask:%s\n", WiFi.subnetMask().toString().c_str());
 
-    Serial.println("* Press ansy key to enter a compression ratio in 5 seconds..." );
+    Serial.printf("* Current compression ratio: 0x%02X. Press any key to change it in 5 seconds...", camera.ratio);
     Serial.onReceive(eventKeyInput);
-    timerCamera.onFired(taskTakePicture, NULL);
+    timerCamera.onFired(taskTakePicture, nullptr);
     timerCamera.startOneShot(5000);
     Serial.listen();
     break;
@@ -183,7 +197,7 @@ static void eventWiFi(WiFiClass::event_id_t event, void *info) {
 void setup() {
   Serial.begin(115200);
   camera.begin();
-  Serial.println("\n\t***** VC0706 camera test *****" );
+  Serial.println("\n***** VC0706 camera test *****\n");
 
   WiFi.mode(WiFi.MODE_STA);
   WiFi.disconnect();
