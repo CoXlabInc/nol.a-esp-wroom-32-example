@@ -5,6 +5,8 @@ Timer timerHello;
 Timer timerHello2;
 ESP32Serial Serial2(ESP32Serial::PORT2, 17, 16);
 
+uint8_t countNoInit __attribute__((section(".noinit")));
+
 static void taskHello(void *) {
   struct timeval t;
   gettimeofday(&t, NULL);
@@ -17,7 +19,10 @@ static void taskHello(void *) {
   );
 
   digitalToggle(2);
-  Serial.printf(" GPIO0:%d, GPIO2:%d\n", digitalRead(0), digitalRead(2));
+  countNoInit++;
+
+  Serial.printf(" GPIO0:%d, GPIO2:%d, countNoInit:%u\n", digitalRead(0), digitalRead(2), countNoInit);
+  Serial2.printf(" GPIO0:%d, GPIO2:%d, countNoInit:%u\n", digitalRead(0), digitalRead(2), countNoInit);
 }
 
 static void taskHello2(void *) {
@@ -45,12 +50,18 @@ static void eventSerialRx(SerialPort &p) {
   while (p.available() > 0) {
     char c = p.read();
     Serial.write(c); //echo or forward
+
+    if (c == 0x1B) {
+      reboot();
+    }
   }
 }
 
 void setup() {
   Serial.begin(115200);
   Serial.println("*** [ESP-WROOM-32] Basic ***");
+  Serial.println("- This app shows how to use GPIOs, SerialPorts, Timers, and noinit variables.");
+  Serial.println("- Press 'ESC' key to software reset to test noinit variable countNoInit's value.");
   Serial.onReceive(eventSerialRx);
   Serial.listen();
 
