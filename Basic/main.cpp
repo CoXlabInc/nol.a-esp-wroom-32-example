@@ -42,7 +42,7 @@ static void eventKeyPressed(GPIOInterruptInfo_t &info) {
   gettimeofday(&now, NULL);
   Serial.printf(
     "* Key connected to GPIO(%d) is pressed! (interrupt:%u.%06u, now:%u.%06u)\n",
-    info.pin, info.tEnteredISR.tv_sec, info.tEnteredISR.tv_usec, now.tv_sec, now.tv_usec
+    info.pin, info.timeEnteredISR.tv_sec, info.timeEnteredISR.tv_usec, now.tv_sec, now.tv_usec
   );
 }
 
