@@ -61,9 +61,8 @@ void setup() {
   oBeacon.setProximityUUID(BLEUUID(BEACON_UUID));
   oBeacon.setMajor(0x0102);
   oBeacon.setMinor(0x0304);
-  BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
-  BLEAdvertisementData oScanResponseData = BLEAdvertisementData();
 
+  BLEAdvertisementData oAdvertisementData;
   oAdvertisementData.setFlags(0x04); // BR_EDR_NOT_SUPPORTED 0x04
 
   std::string strServiceData = "";
@@ -74,6 +73,8 @@ void setup() {
   oAdvertisementData.addData(strServiceData);
 
   pAdvertising->setAdvertisementData(oAdvertisementData);
+
+  BLEAdvertisementData oScanResponseData;
   pAdvertising->setScanResponseData(oScanResponseData);
 
   timerHello.startPeriodic(1000);
