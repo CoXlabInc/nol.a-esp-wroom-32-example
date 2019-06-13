@@ -46,7 +46,7 @@ const char *rootCA = \
 ESP32Serial Serial2(ESP32Serial::PORT2, 17, 16);
 PMS3003 pms3003 = PMS3003(Serial2, 19, 18);
 ESP32TwoWire Wire(0, 27, 14, 400000);
-Adafruit_SSD1306 display(-1, Wire, 0x3C);
+Adafruit_SSD1306 display(128, 64, &Wire);
 Timer timerReport;
 String jsonData;
 uint16_t seq = 0;
@@ -159,7 +159,7 @@ void setup() {
   WiFi.mode(WiFi.MODE_STA);
   WiFi.disconnect();
 
-  display.begin(SSD1306_SWITCHCAPVCC);
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.setTextColor(WHITE);
   display.setTextSize(2);
   display.clearDisplay();

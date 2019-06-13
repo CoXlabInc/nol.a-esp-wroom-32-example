@@ -72,7 +72,7 @@ void setup() {
   BLEDevice::init("");
   pBLEScan = BLEDevice::getScan(); //create new scan
   pBLEScan->setAdvertisedDeviceCallbacks(&listener, true);
-  pBLEScan->activeScan = true;
+  pBLEScan->setActiveScan(true);
   isScanning = pBLEScan->start(0, nullptr);
   if (isScanning) {
     printf("* Now scanning...\n");
